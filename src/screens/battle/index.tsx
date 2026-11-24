@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "@/i18n";
 import { Avatar, HpBar } from "@/components/bars";
 import { ENCOUNTER, exampleFoes, exampleParty, kitFor } from "@/data/fixtures";
 import type { Entry } from "@/data/fixtures";
 import type { Skin } from "@/data/skins";
+import type { KitsApi } from "@/lib/kits";
 import { setSources, useSources } from "@/lib/sources";
 import { aiChoices, applyDefeat, fighterFromSheet, GUARD_POINTS, makeRng, maxHpOf, resolveRound, standing, ZONE_MULT } from "@/rules";
 import type { BattleState, Choice, Fighter, Zone } from "@/rules";
@@ -13,9 +14,9 @@ import { lineOf, nameOf } from "./log";
 import type { Line } from "./log";
 import { ChatDraft, DashStatus, PartyCards, RoundLog, Src, TurnStrip } from "./panels";
 
-function build(entries: Entry[]): BattleState {
+function build(entries: Entry[], kitOf: KitsApi["kitOf"]): BattleState {
   const src = (entries.length ? entries : exampleParty()).slice(0, 4);
-  const party = src.map((e) => fighterFromSheet(e.sheet, kitFor(e.id, "party")));
+  const party = src.map((e) => fighterFromSheet(e.sheet, kitFor(e.id, "party", kitOf(e.id))));
   const foes = exampleFoes().map((f) => fighterFromSheet(f.sheet, kitFor(f.id, "foe")));
   return { round: 0, fighters: [...party, ...foes], stakes: { flee: true, defeat: 2 }, outcome: null, now: 0 };
 }
@@ -29,8 +30,8 @@ const readDash = (): boolean => {
   }
 };
 
-export function BattleScreen({ entries, skin, seed }: { entries: Entry[]; skin: Skin; seed?: number }) {
-  const [battle, setBattle] = useState<BattleState>(() => build(entries));
+export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: { entries: Entry[]; skin: Skin; seed?: number; kits: KitsApi; onMuster: () => void; onRound: (round: number) => void }) {
+  const [battle, setBattle] = useState<BattleState>(() => build(entries, kits.kitOf));
   const [lines, setLines] = useState<Line[]>([]);
   const [pending, setPending] = useState<Choice[]>([]);
   const [picks, setPicks] = useState<Record<string, string>>({});
@@ -45,6 +46,11 @@ export function BattleScreen({ entries, skin, seed }: { entries: Entry[]; skin: 
   const [dashOn, setDashOnState] = useState<boolean>(readDash);
   const sources = useSources();
   const rng = useRef(makeRng(seed ?? Date.now() % 100000));
+  // before the first round the muster may still change what the party carries; the fight takes it as it is after that
+  useEffect(() => {
+    setBattle((b) => (b.round === 0 && !b.outcome ? build(entries, kits.kitOf) : b));
+  }, [kits.version, entries, kits.kitOf]);
+  useEffect(() => onRound(battle.outcome ? 0 : battle.round), [battle.round, battle.outcome, onRound]);
 
   const party = battle.fighters.filter((f) => f.side === "party");
   const foes = battle.fighters.filter((f) => f.side === "foe");
@@ -137,7 +143,7 @@ export function BattleScreen({ entries, skin, seed }: { entries: Entry[]; skin: 
     else play({ kind: "strike", by: active.id, target: target.id, zone, guard: g }, pickText());
   };
   const restart = () => {
-    setBattle(build(entries));
+    setBattle(build(entries, kits.kitOf));
     setLines([]);
     setPending([]);
     setPicks({});
@@ -178,6 +184,7 @@ export function BattleScreen({ entries, skin, seed }: { entries: Entry[]; skin: 
         <span className="chip tl" title={t("battle.exampleHint")}>{t("battle.example")}</span>
         <span className="chip mono">{t("battle.contract", { v: ENCOUNTER.contract })}</span>
         <span className="grow" />
+        {battle.round === 0 && !battle.outcome && <button type="button" className="btn sm" onClick={onMuster}>🎒 {t("tab.muster")}</button>}
         {battle.stakes.flee && <span className="chip am">{t("battle.fleeAllowed")}</span>}
         <span className="chip rd" title={t("defeat.step" + battle.stakes.defeat)}>{t("battle.defeatChip", { step: t("defeat.name." + stakeDefeat) })}</span>
         <span className="chip" role="status">{t("battle.round", { n: battle.round + (battle.outcome ? 0 : 1) })}</span>

@@ -37,12 +37,25 @@ Look: the owner's mockups (dark, red accent, serif headings, mono numbers, cyan 
 - Battle runs on a made-up encounter with the real rules: whole party or only the hero, strike zone and two guard points, powers
   (wits scale harmful ones, spirit helping ones), items from the backpack and the belt, flee, skip, log, outcome with the defeat step.
 - Skins: the words for block, powers and field change per skin (`?skin=cyberpunk` in a preview); numbers do not.
-- Both languages (en, uk), a test that keys match and that every key the UI uses exists.
+- Both languages (en, uk), a test that keys match and that every key the UI uses exists; the example items have both languages too.
+
+## Muster screen (P5, built to the mockup B v5)
+- A tab "Muster" and a "Muster" button in the battle header while no round has been played; "To battle!" goes back.
+- Header with "before the fight", "belt open" or "belt locked", the rule line, the scene line; a selector for whose muster it is
+  (every fighter has their own backpack and belt).
+- Backpack: search, filters (all, weapons, medicine, misc), the counter "shown N of M", a scrolling list (17 example items so the
+  search and the scroll have work to do), empty and no-match states; each row shows the cost "-1 block".
+- Hero card with the belt counter, the belt of three slots (items cost 0, free slots drawn dashed), the note "add only here".
+- Inspect: icon, name, effect, both costs (backpack -1 block, belt 0), the lore line (card), "from: ... left: N pcs" (example),
+  buttons "To belt" and "To backpack" with the reason in text when a move is refused (belt full, fight begun), and a live line
+  that says what moved. On a phone the inspector scrolls into view when an item is tapped; the footer with "To battle!" is sticky.
+- The belt and the backpack go into the fight as they are: the battle follows the muster until the first round, and after it the
+  muster shows "belt locked" and refuses every move. Kits are kept in this browser (`rpg:kits`).
+- Real characters start with an empty backpack; the example heroes have the example kit. Items found in a fight go into the
+  backpack only when the loot handoff exists (P4).
 
 ## Not built (on purpose or later)
 - Sheets from a Roleplay card and a model (P4, with the Fight button and the encounter builder).
-- The muster screen (B v4 and v5: backpack with search and filters, belt slots, item inspector) is P5. In the battle the
-  Inventory tab already lists the backpack and the belt of the acting fighter.
 - Send summary and the dashboard status are drawn and the status switch is remembered, but nothing is sent: they need the
   chat handoff (P2, P4). The button says why it is off.
 - Items whose effect the rules do not know yet (the crooked knife, "strike x1.15") are listed and disabled with the reason.

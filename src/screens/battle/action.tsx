@@ -3,6 +3,7 @@ import { GUARD_POINTS, hitChance, parseEffect, ZONE_MULT, ZONES } from "@/rules"
 import type { Fighter, Item, Power, Zone } from "@/rules";
 import { Body } from "./body";
 import { Src } from "./panels";
+import { itemName, kindInfo, pick } from "@/data/items";
 import type { Skin, SkinWord } from "@/data/skins";
 
 export type Kind = "strike" | "power" | "item";
@@ -36,8 +37,8 @@ export const itemLine = (i: Item): string => {
   const fx = parseEffect(i.effect);
   if (fx?.key === "heal") return t("item.heal", { n: fx.a });
   if (fx?.key === "treat") return t("item.treat", { sev: t("sev." + fx.b).toLowerCase() });
-  const note = t("item.note." + i.id);
-  return (note === "item.note." + i.id ? "" : note + " · ") + t("item.noUse");
+  const k = kindInfo(i.id);
+  return (k?.fx ? pick(k.fx) + " · " : "") + t("item.noUse");
 };
 export const itemUsable = (i: Item): boolean => parseEffect(i.effect) !== null;
 
@@ -150,7 +151,7 @@ export function ActionPanel(p: ActionProps) {
               {active.backpack.map((i) => (
                 <li key={i.id}>
                   <button type="button" className={"power-row" + (p.item?.id === i.id && p.item.from === "backpack" && p.kind === "item" ? " on" : "")} disabled={!itemUsable(i)} aria-pressed={p.item?.id === i.id && p.item.from === "backpack"} onClick={() => p.pickItem({ from: "backpack", id: i.id })}>
-                    <span className="grow"><b className="k">{i.name}</b><span className="mu"> {itemLine(i)}</span></span>
+                    <span className="grow"><b className="k">{itemName(i)}</b><span className="mu"> {itemLine(i)}</span></span>
                     <span className="chip mono">−1 {skinWord(p.skin, "guard").toLowerCase()}</span>
                   </button>
                 </li>
@@ -162,7 +163,7 @@ export function ActionPanel(p: ActionProps) {
               {active.belt.map((i) => (
                 <li key={i.id}>
                   <button type="button" className={"power-row" + (p.item?.id === i.id && p.item.from === "belt" && p.kind === "item" ? " on" : "")} disabled={!itemUsable(i)} aria-pressed={p.item?.id === i.id && p.item.from === "belt"} onClick={() => p.pickItem({ from: "belt", id: i.id })}>
-                    <span className="grow"><b className="k">{i.name}</b><span className="mu"> {itemLine(i)}</span></span>
+                    <span className="grow"><b className="k">{itemName(i)}</b><span className="mu"> {itemLine(i)}</span></span>
                     <span className="chip mono">0 · {t("battle.ready")}</span>
                   </button>
                 </li>

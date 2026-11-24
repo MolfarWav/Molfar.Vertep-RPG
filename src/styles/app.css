@@ -185,7 +185,38 @@ button, input { font: inherit; color: inherit; }
 .src { display: inline-block; font: 10.5px/1.4 Consolas, monospace; padding: 0 5px; border: 1px solid; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
 .src.code { color: var(--ok); border-color: var(--ok); } .src.sensor { color: var(--am); border-color: var(--am); } .src.card { color: #b08cff; border-color: #b08cff; } .src.example { color: var(--mu); border-color: var(--mu); }
 
+/* muster */
+.muster { display: grid; gap: 12px; }
+.muster .b-head, .muster .scene, .muster .b-foot { grid-area: auto; }
+.muster-grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.m-mid { display: grid; gap: 12px; min-width: 0; }
+.who { margin-left: 0; width: 100%; }
+.who button { flex: 1; }
+.search { width: 100%; min-height: 40px; padding: 6px 12px; background: var(--pn2); border: 1px solid var(--ln); border-radius: 3px; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.pill { min-height: 36px; padding: 4px 14px; border: 1px solid var(--ln); border-radius: 999px; background: var(--pn2); color: var(--mu); cursor: pointer; font: 13px Kurale, Georgia, serif; }
+.pill.on { border-color: var(--am); color: var(--am); background: color-mix(in srgb, var(--am) 10%, var(--pn2)); }
+.count { margin-bottom: 6px; }
+.items { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.items.scroll { max-height: 420px; overflow-y: auto; padding-right: 4px; }
+.power-row.item { align-items: center; }
+.power-row.dim .k, .power-row.dim .ico { opacity: .7; }
+.ico.big { font-size: 22px; width: 30px; text-align: center; }
+.ico.huge { font-size: 52px; line-height: 1; }
+.fx { font-size: 12px; }
+.slot-free { min-height: 48px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--ln); border-radius: 3px; color: var(--mu); font-size: 13px; }
+.hero-card { display: flex; gap: 12px; align-items: center; }
+.inspect { display: grid; gap: 8px; justify-items: start; }
+.inspect h3 { margin: 0; font-size: 20px; }
+.inspect p { margin: 0; }
+.lore { font-style: italic; color: var(--mu); }
+.b-btns.left { margin-left: 0; }
+.hint.warn { color: var(--warn); }
+.grow-line2 { flex: 1; margin: 0; min-width: 200px; }
+
 @media (max-width: 1180px) {
+  .muster-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .m-inspect { grid-column: 1 / -1; }
   .battle { grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "head head" "scene scene" "strip strip" "center side" "party side"; }
 }
 @media (max-width: 899px) {
@@ -196,6 +227,12 @@ button, input { font: inherit; color: inherit; }
   .strip { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
   .strip-item { flex: none; }
   .b-party { display: none; }
+  .muster-grid { grid-template-columns: minmax(0, 1fr); }
+  .m-mid { order: -1; }
+  .items.scroll { max-height: 320px; }
+  .muster .b-foot { position: sticky; bottom: 64px; z-index: 4; }
+  .muster .b-head .btn.big { display: none; }
+  .ico.huge { font-size: 40px; }
   .field { grid-template-columns: minmax(0, 1fr); gap: 4px; } .field .side { justify-content: flex-start !important; flex-wrap: nowrap; overflow-x: auto; gap: 4px; } .field .side:last-child { justify-content: flex-end !important; } .fig { width: 76px; flex: none; } .vs { display: flex; justify-content: center; gap: 8px; align-items: baseline; }
   .act-strike { grid-template-columns: 112px minmax(0, 1fr); gap: 10px; } .body { width: 100px; } .body-col { padding: 4px; }
   .seg .long { display: none; } .seg .short { display: inline; }

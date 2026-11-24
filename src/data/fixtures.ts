@@ -1,7 +1,8 @@
 // The example party and encounter. Real sheets come from Roleplay characters and real encounters from a chat
 // (later phases); until then the app shows these, so every screen can be seen and tried.
 import { cleanSheet } from "@/rules";
-import type { FighterKit, Item, Power, Sheet } from "@/rules";
+import type { Kit } from "@/lib/kits";
+import type { FighterKit, Power, Sheet } from "@/rules";
 
 export interface Entry {
   id: string;
@@ -29,23 +30,12 @@ const POWERS: Record<string, Power[]> = {
   "ex-medli": [{ id: "warm", name: "Warm word", effect: "heal:14" }],
   "ex-ember": [{ id: "spark", name: "Spark", effect: "damage:9:fire" }, { id: "fog", name: "Thick fog", effect: "hit_mod:-15:1" }],
 };
-const BACKPACK = (): Item[] => [
-  { id: "knife", name: "Crooked knife", effect: "weapon:1.15" },
-  { id: "bandage", name: "Strong bandage", effect: "heal:18" },
-  { id: "moss", name: "Dried mushroom", effect: "treat:light" },
-];
-const BELT = (): Item[] => [
-  { id: "belt-bandage", name: "Bandage from the belt", effect: "heal:18" },
-  { id: "belt-moss", name: "Mushroom from the belt", effect: "treat:light" },
-];
-const HAS_KIT = new Set(["ex-vlad", "ex-garret"]);
-
-export const kitFor = (id: string, side: "party" | "foe"): FighterKit => ({
+export const kitFor = (id: string, side: "party" | "foe", kit?: Kit): FighterKit => ({
   id,
   side,
   powers: (POWERS[id] ?? []).map((p) => ({ ...p })),
-  belt: side === "party" && HAS_KIT.has(id) ? BELT() : [],
-  backpack: side === "party" && (HAS_KIT.has(id) || id === "ex-medli") ? BACKPACK() : [],
+  belt: side === "party" && kit ? kit.belt.map((i) => ({ ...i })) : [],
+  backpack: side === "party" && kit ? kit.backpack.map((i) => ({ ...i })) : [],
   weapon: id === "ex-vlad" ? 1.15 : 1,
 });
 
