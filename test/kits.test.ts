@@ -59,3 +59,17 @@ test("example kits: the party starts with a belt of two, a real character with n
   expect(initialKit("ex-vlad").backpack.every((i) => !initialKit("ex-vlad").belt.some((b) => b.id === i.id))).toBe(true);
   expect(initialKit("some-card")).toEqual({ backpack: [], belt: [] });
 });
+
+import { mergeLoaded } from "../src/lib/sheets-store";
+import { tableSheet } from "../src/rules";
+
+test("the saved list arriving after a party was added keeps both, and a saved sheet wins", () => {
+  const mk = (id: string, name: string) => ({ id, sheet: tableSheet(name), proposal: null });
+  const saved = [mk("a", "Saved A"), mk("b", "Saved B")];
+  const memory = [mk("b", "Fresh B"), mk("c", "Fresh C")];
+  const out = mergeLoaded(saved, memory);
+  expect(out.map((e) => e.id)).toEqual(["a", "b", "c"]);
+  expect(out.find((e) => e.id === "b")?.sheet.name).toBe("Saved B");
+  expect(mergeLoaded([], memory).map((e) => e.id)).toEqual(["b", "c"]);
+  expect(mergeLoaded(saved, [])).toEqual(saved);
+});

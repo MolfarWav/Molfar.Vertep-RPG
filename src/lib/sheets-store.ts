@@ -13,6 +13,15 @@ interface Stored {
 
 const clean = (e: Stored): Entry => ({ id: e.id, sheet: cleanSheet(e.sheet), proposal: e.proposal ? cleanSheet(e.proposal) : null });
 
+/**
+ * The sheets the engine had saved, joined with what was added in memory while the list was still loading (a party that came from a
+ * chat arrives at once, the saved list a moment later). A sheet saved earlier wins over one built now with the same id.
+ */
+export function mergeLoaded(saved: Entry[], inMemory: Entry[]): Entry[] {
+  const have = new Set(saved.map((e) => e.id));
+  return [...saved, ...inMemory.filter((e) => !have.has(e.id))];
+}
+
 export interface SheetsApi {
   entries: Entry[];
   loading: boolean;
@@ -37,7 +46,7 @@ export function useSheets(): SheetsApi {
   useEffect(() => {
     if (PREVIEW) return;
     call<{ sheets: Stored[] }>("GET", "/sheets")
-      .then((r) => setEntries(r.sheets.map(clean)))
+      .then((r) => setEntries((old) => mergeLoaded(r.sheets.map(clean), old)))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
