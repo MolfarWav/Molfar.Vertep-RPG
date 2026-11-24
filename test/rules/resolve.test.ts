@@ -191,3 +191,25 @@ test("property: 2000 random battles keep HP in range, end within 60 rounds, and 
     expect(["won", "lost", "fled", "aborted"]).toContain(s.outcome as string);
   }
 });
+
+test("magic: wits scale harmful powers and spirit scales helping ones, neutral at 3", () => {
+  const spark = { id: "spark", name: "Spark", effect: "damage:10:fire" };
+  const mend = { id: "mend", name: "Mend", effect: "heal:10" };
+  const dmgWith = (wits: number) => {
+    const s = battle([fighter("a", "party", { level: 10, stats: { wits }, powers: [{ ...spark }] }), fighter("x", "foe", { stats: { endurance: 10 } })]);
+    const r = resolveRound(s, [{ kind: "power", by: "a", power: "spark", target: "x", guard: [] }], stubRng(true));
+    const e = r.events.find((x) => x.t === "power");
+    return e && e.t === "power" ? e.damage : -1;
+  };
+  expect(dmgWith(3)).toBe(10);
+  expect(dmgWith(8)).toBe(15);
+  expect(dmgWith(1)).toBe(8);
+  const healWith = (spirit: number) => {
+    const s = battle([fighter("a", "party", { level: 10, stats: { spirit }, powers: [{ ...mend }] }), fighter("b", "party", { hp: 1 }), fighter("x", "foe")]);
+    const r = resolveRound(s, [{ kind: "power", by: "a", power: "mend", target: "b", guard: [] }], stubRng(false));
+    const e = r.events.find((x) => x.t === "power");
+    return e && e.t === "power" ? e.heal : -1;
+  };
+  expect(healWith(3)).toBe(10);
+  expect(healWith(6)).toBe(13);
+});

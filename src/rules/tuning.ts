@@ -66,3 +66,12 @@ export const TIMID_COURAGE = 35;
 /** Under the deadly defeat step a fighter at 0 HP risks death each round. */
 export const DEATH_ROLL = 0.25;
 export const MAX_ROUNDS = 60;
+
+/**
+ * Magic (owner, 2026-11-24: wits and spirit are for magic). A power's number is scaled by one stat: wits for powers
+ * that hurt (`damage`, `burn`), spirit for powers that help or steady (`heal`, `hit_mod`). Neutral at 3, a tenth per point.
+ * A proposal, to be confirmed.
+ */
+export const POWER_STAT_NEUTRAL = 3;
+export const POWER_STAT_STEP = 0.1;
+export const powerScale = (stat: number): number => Math.max(0.3, 1 + (stat - POWER_STAT_NEUTRAL) * POWER_STAT_STEP);

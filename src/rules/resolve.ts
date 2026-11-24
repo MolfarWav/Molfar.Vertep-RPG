@@ -14,6 +14,7 @@ import {
   HIT_MAX,
   HIT_MIN,
   MAX_ROUNDS,
+  powerScale,
   strikeBase,
   ZONE_HIT,
   ZONE_MULT,
@@ -169,14 +170,15 @@ export function resolveRound(input: BattleState, choices: readonly Choice[], rng
       let dmg = 0;
       let hl = 0;
       if (fx.key === "damage") {
-        dmg = Math.max(1, Math.round(fx.a));
+        dmg = Math.max(1, Math.round(fx.a * powerScale(att.stats.wits)));
         add(damage, tgt.id, dmg);
       } else if (fx.key === "heal") {
-        hl = Math.max(0, Math.round(fx.a));
+        hl = Math.max(0, Math.round(fx.a * powerScale(att.stats.spirit)));
         add(heal, tgt.id, hl);
       } else {
         const rounds = Math.max(1, Math.round(Number(fx.b) || 1));
-        tgt.statuses.push({ kind: fx.key as "hit_mod" | "burn", n: Math.round(fx.a), rounds });
+        const scale = powerScale(fx.key === "burn" ? att.stats.wits : att.stats.spirit);
+        tgt.statuses.push({ kind: fx.key as "hit_mod" | "burn", n: Math.round(fx.a * scale), rounds });
       }
       const src = byId(state, id) as Fighter;
       const p = src.powers.find((x) => x.id === l.power?.id);
