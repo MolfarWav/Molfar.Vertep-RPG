@@ -65,6 +65,12 @@ export function t(key: string, vars?: Record<string, string | number>): string {
   return vars ? raw.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : raw;
 }
 
+/** A string in a given language, not the one on screen (the result written for a chat follows the chat's language). */
+export function tIn(l: Lang, key: string, vars?: Record<string, string | number>): string {
+  const raw = dictionary[l][key] ?? dictionary.en[key] ?? key;
+  return vars ? raw.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : raw;
+}
+
 /** Re-renders a component when the language changes. */
 export function useLang(): Lang {
   return useSyncExternalStore(

@@ -1,0 +1,8 @@
+{
+  "name": "RPG encounters",
+  "version": "0.1.0",
+  "description": "Reads the fights Roleplay hands over (its rpg-outbox folder, only after you allowed it) and keeps the results this app writes back.",
+  "origin": "local",
+  "permissions": ["routes", "fs", "peer"],
+  "priority": 31
+}

@@ -185,6 +185,9 @@ button, input { font: inherit; color: inherit; }
 .src { display: inline-block; font: 10.5px/1.4 Consolas, monospace; padding: 0 5px; border: 1px solid; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
 .src.code { color: var(--ok); border-color: var(--ok); } .src.sensor { color: var(--am); border-color: var(--am); } .src.card { color: #b08cff; border-color: #b08cff; } .src.example { color: var(--mu); border-color: var(--mu); }
 
+.enc-banner .bd { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.enc-banner { margin-bottom: 12px; border-color: var(--am); }
+
 /* muster */
 .muster { display: grid; gap: 12px; }
 .muster .b-head, .muster .scene, .muster .b-foot { grid-area: auto; }

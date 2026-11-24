@@ -21,6 +21,8 @@ export interface SheetsApi {
   saved: boolean;
   change: (id: string, sheet: Sheet) => void;
   addExamples: () => void;
+  /** Adds the sheets that are not there yet (a party that came from a chat); one saved earlier is kept as it is. */
+  ensure: (list: Entry[]) => void;
   remove: (id: string) => void;
 }
 
@@ -82,10 +84,23 @@ export function useSheets(): SheetsApi {
     });
   }, [put]);
 
+  const ensure = useCallback(
+    (list: Entry[]) => {
+      setEntries((old) => {
+        const have = new Set(old.map((e) => e.id));
+        const fresh = list.filter((e) => !have.has(e.id));
+        if (!fresh.length) return old;
+        for (const e of fresh) put(e);
+        return [...old, ...fresh];
+      });
+    },
+    [put],
+  );
+
   const remove = useCallback((id: string) => {
     setEntries((list) => list.filter((e) => e.id !== id));
     if (!PREVIEW) call("DELETE", `/sheets/${id}`).catch((err: Error) => setError(err.message));
   }, []);
 
-  return { entries, loading, error, saved, change, addExamples, remove };
+  return { entries, loading, error, saved, change, addExamples, ensure, remove };
 }

@@ -7,6 +7,7 @@ import { BELT_SLOTS } from "@/lib/kits";
 import type { KitsApi } from "@/lib/kits";
 import { hpMax, hpNowOf, parseEffect } from "@/rules";
 import type { Item } from "@/rules";
+import type { Encounter } from "@/contract";
 import type { Entry } from "@/data/fixtures";
 import { gearOf, Src } from "@/screens/battle/panels";
 import { itemLine } from "@/screens/battle/action";
@@ -18,7 +19,7 @@ interface Sel {
 
 const usable = (i: Item): boolean => parseEffect(i.effect) !== null;
 
-export function MusterScreen({ entries, kits, locked, onToBattle }: { entries: Entry[]; kits: KitsApi; locked: boolean; onToBattle: () => void }) {
+export function MusterScreen({ entries, kits, locked, onToBattle, onBack, encounter = null }: { entries: Entry[]; kits: KitsApi; locked: boolean; onToBattle: () => void; onBack?: () => void; encounter?: Encounter | null }) {
   const [heroId, setHeroId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<Category | "all">("all");
@@ -78,14 +79,14 @@ export function MusterScreen({ entries, kits, locked, onToBattle }: { entries: E
   return (
     <div className="muster">
       <header className="card b-head">
-        <h2 className="k">{t("muster.title", { name: hero.sheet.name })}</h2>
+        <h2 className="k">{encounter ? t("muster.titleChat", { name: hero.sheet.name, place: encounter.place || t("battle.fight") }) : t("muster.title", { name: hero.sheet.name })}</h2>
         <span className="chip tl">{t("muster.beforeBattle")}</span>
         <span className={"chip " + (locked ? "rd" : "am")}>{locked ? t("muster.beltLocked") : t("muster.beltOpen")}</span>
         <span className="grow" />
         <span className="hint">{t("muster.inBattle")}</span>
         <button type="button" className="btn rd big" onClick={onToBattle}>⚔ {t("muster.toBattle")}</button>
       </header>
-      <p className="scene k">«{t("enc.muster")}» <Src k="sensor" /></p>
+      <p className="scene k">«{encounter?.scene || t("enc.muster")}» <Src k="sensor" /></p>
 
       <div className="muster-grid">
         <section className="card m-back" aria-label={t("battle.backpack")}>
@@ -173,10 +174,10 @@ export function MusterScreen({ entries, kits, locked, onToBattle }: { entries: E
       <footer className="card b-foot">
         <p className="hint grow-line2">{t("muster.saved")} <Src k="code" /></p>
         <div className="b-btns">
-          <button type="button" className="btn ghost" disabled aria-describedby="back-why">← {t("muster.back")}</button>
+          <button type="button" className="btn ghost" disabled={!onBack} onClick={onBack} aria-describedby={onBack ? undefined : "back-why"}>← {t("muster.back")}</button>
           <button type="button" className="btn rd big" onClick={onToBattle}>⚔ {t("muster.toBattle")}</button>
         </div>
-        <p className="hint grow-line" id="back-why">{t("muster.backWhy")}</p>
+        {!onBack && <p className="hint grow-line" id="back-why">{t("muster.backWhy")}</p>}
       </footer>
     </div>
   );

@@ -1,10 +1,19 @@
 {
   "name": "RPG",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "engine": ">=1.0.0",
   "kind": "app",
   "description": "An optional RPG companion to Roleplay: character sheets with levels, and turn-based battles with strike zones, guard and magic. Roleplay works fully without it.",
   "origin": "local",
   "author": "Molfar Vertep",
-  "repository": "https://github.com/MolfarWav/Molfar.Vertep-RPG"
+  "repository": "https://github.com/MolfarWav/Molfar.Vertep-RPG",
+  "reads": [
+    {
+      "app": "roleplay",
+      "paths": [
+        "rpg-outbox/*.json"
+      ],
+      "why": "Read the fights Roleplay hands over: who is in the party, who they fight and the stakes. Read only when a fight is opened, never anything else."
+    }
+  ]
 }

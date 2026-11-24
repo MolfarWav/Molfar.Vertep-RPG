@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "@/i18n";
 import { Avatar, HpBar } from "@/components/bars";
+import { buildResult } from "@/contract/build";
+import type { Encounter, Result } from "@/contract";
 import { ENCOUNTER, exampleFoes, exampleParty, kitFor } from "@/data/fixtures";
 import type { Entry } from "@/data/fixtures";
 import type { Skin } from "@/data/skins";
 import type { KitsApi } from "@/lib/kits";
 import { setSources, useSources } from "@/lib/sources";
 import { aiChoices, applyDefeat, fighterFromSheet, GUARD_POINTS, makeRng, maxHpOf, resolveRound, standing, ZONE_MULT } from "@/rules";
+import { foeSheet } from "@/rules/foes";
 import type { BattleState, Choice, Fighter, Zone } from "@/rules";
 import { ActionPanel, harmful, skinWord } from "./action";
 import type { ItemPick, Kind, Tab } from "./action";
@@ -14,9 +17,15 @@ import { lineOf, nameOf } from "./log";
 import type { Line } from "./log";
 import { ChatDraft, DashStatus, PartyCards, RoundLog, Src, TurnStrip } from "./panels";
 
-function build(entries: Entry[], kitOf: KitsApi["kitOf"]): BattleState {
+function build(entries: Entry[], kitOf: KitsApi["kitOf"], enc: Encounter | null): BattleState {
   const src = (entries.length ? entries : exampleParty()).slice(0, 4);
   const party = src.map((e) => fighterFromSheet(e.sheet, kitFor(e.id, "party", kitOf(e.id))));
+  if (enc) {
+    // a fight from a chat: the opponents come as names, code gives them numbers by level and archetype
+    const level = Math.max(1, Math.round(src.reduce((a, e) => a + e.sheet.level, 0) / Math.max(1, src.length)));
+    const foes = enc.foes.map((f, i) => fighterFromSheet(foeSheet(f, level), kitFor(`foe-${i}`, "foe")));
+    return { round: 0, fighters: [...party, ...foes], stakes: enc.stakes, outcome: null, now: 0 };
+  }
   const foes = exampleFoes().map((f) => fighterFromSheet(f.sheet, kitFor(f.id, "foe")));
   return { round: 0, fighters: [...party, ...foes], stakes: { flee: true, defeat: 2 }, outcome: null, now: 0 };
 }
@@ -30,8 +39,25 @@ const readDash = (): boolean => {
   }
 };
 
-export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: { entries: Entry[]; skin: Skin; seed?: number; kits: KitsApi; onMuster: () => void; onRound: (round: number) => void }) {
-  const [battle, setBattle] = useState<BattleState>(() => build(entries, kits.kitOf));
+export interface BattleProps {
+  entries: Entry[];
+  skin: Skin;
+  seed?: number;
+  kits: KitsApi;
+  onMuster: () => void;
+  onRound: (round: number) => void;
+  /** The fight Roleplay handed over, if this one comes from a chat. */
+  encounter?: Encounter | null;
+  /** A sheet id back to the person's id in the chat. */
+  idMap?: Record<string, string>;
+  /** Saves the result and opens Roleplay; resolves to "" when Roleplay was opened, "saved" when only saved, else the reason it failed. */
+  onReturn?: (result: Result, battle: BattleState) => Promise<string>;
+}
+
+export function BattleScreen({ entries, skin: skinProp, seed, kits, onMuster, onRound, encounter = null, idMap = {}, onReturn }: BattleProps) {
+  const skin = encounter?.skin ?? skinProp;
+  const [battle, setBattle] = useState<BattleState>(() => build(entries, kits.kitOf, encounter));
+  const [returned, setReturned] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [pending, setPending] = useState<Choice[]>([]);
   const [picks, setPicks] = useState<Record<string, string>>({});
@@ -45,11 +71,12 @@ export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: {
   const [targetId, setTargetId] = useState<string | null>(null);
   const [dashOn, setDashOnState] = useState<boolean>(readDash);
   const sources = useSources();
-  const rng = useRef(makeRng(seed ?? Date.now() % 100000));
+  const seedRef = useRef(seed ?? Date.now() % 100000);
+  const rng = useRef(makeRng(seedRef.current));
   // before the first round the muster may still change what the party carries; the fight takes it as it is after that
   useEffect(() => {
-    setBattle((b) => (b.round === 0 && !b.outcome ? build(entries, kits.kitOf) : b));
-  }, [kits.version, entries, kits.kitOf]);
+    setBattle((b) => (b.round === 0 && !b.outcome ? build(entries, kits.kitOf, encounter) : b));
+  }, [kits.version, entries, kits.kitOf, encounter]);
   useEffect(() => onRound(battle.outcome ? 0 : battle.round), [battle.round, battle.outcome, onRound]);
 
   const party = battle.fighters.filter((f) => f.side === "party");
@@ -143,7 +170,8 @@ export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: {
     else play({ kind: "strike", by: active.id, target: target.id, zone, guard: g }, pickText());
   };
   const restart = () => {
-    setBattle(build(entries, kits.kitOf));
+    setBattle(build(entries, kits.kitOf, encounter));
+    setReturned(null);
     setLines([]);
     setPending([]);
     setPicks({});
@@ -152,7 +180,8 @@ export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: {
   };
 
   const who = useMemo(() => nameOf(battle.fighters), [battle.fighters]);
-  const defeat = battle.outcome === "lost" ? applyDefeat(battle, rng.current, hero?.id) : null;
+  // the defeat is decided once, when the fight is lost (not again on every redraw)
+  const defeat = useMemo(() => (battle.outcome === "lost" ? applyDefeat(battle, makeRng(seedRef.current + 99), hero?.id) : null), [battle, hero?.id]);
   const summary = useMemo(() => {
     const foesText = foes.map((f) => `${f.name} ${f.hp}/${maxHpOf(f)}`).join(", ");
     const partyText = party.filter((f) => f.id !== hero?.id).map((f) => `${f.name} ${f.hp}/${maxHpOf(f)}`).join(", ");
@@ -180,8 +209,8 @@ export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: {
   return (
     <div className="battle">
       <header className="card b-head">
-        <h2 className="k">{t("battle.title")}</h2>
-        <span className="chip tl" title={t("battle.exampleHint")}>{t("battle.example")}</span>
+        <h2 className="k">{encounter ? t("battle.titleChat", { place: encounter.place || t("battle.fight") }) : t("battle.title")}</h2>
+        {!encounter && <span className="chip tl" title={t("battle.exampleHint")}>{t("battle.example")}</span>}
         <span className="chip mono">{t("battle.contract", { v: ENCOUNTER.contract })}</span>
         <span className="grow" />
         {battle.round === 0 && !battle.outcome && <button type="button" className="btn sm" onClick={onMuster}>🎒 {t("tab.muster")}</button>}
@@ -191,7 +220,7 @@ export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: {
         <label className="chk"><input type="checkbox" checked={sources} onChange={(e) => setSources(e.target.checked)} /> {t("battle.showSources")}</label>
       </header>
 
-      <p className="scene k">«{t("enc.scene")}» <Src k="sensor" /></p>
+      <p className="scene k">«{encounter?.scene || t("enc.scene")}» <Src k="sensor" /></p>
 
       <TurnStrip fighters={strip} heroId={hero?.id} picks={picks} activeId={active?.id} />
 
@@ -201,7 +230,7 @@ export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: {
         <section className="card b-field" aria-label={t("battle.field")}>
           <div className="bd field">
             <ul className="side">{party.map((f) => sideBtn(f, true))}</ul>
-            <span className="vs"><span className="k">{t("battle.vs")}</span><b>{t("battle.place")}</b></span>
+            <span className="vs"><span className="k">{t("battle.vs")}</span><b>{encounter?.place || t("battle.place")}</b></span>
             <ul className="side">{foes.map((f) => sideBtn(f, false))}</ul>
           </div>
           <div className="hint b-hint">
@@ -215,8 +244,25 @@ export function BattleScreen({ entries, skin, seed, kits, onMuster, onRound }: {
               <h2 className="k">{t("outcome." + battle.outcome)}</h2>
               <p>{t("outcome." + battle.outcome + ".text", { rounds: battle.round })}</p>
               {defeat && <p className="mu">{t("defeat.step" + defeat.step)}{defeat.offer.length ? " " + t("defeat.offer") : ""}</p>}
-              <p className="hint">{t("battle.toChat")}</p>
-              <button type="button" className="btn go" onClick={restart}>{t("battle.again")}</button>
+              {encounter && onReturn ? (
+                <>
+                  <p className="hint">{t("battle.toChatReal")}</p>
+                  {returned === null || returned.startsWith("error:") ? (
+                    <button type="button" className="btn go big" onClick={() => {
+                      const result = buildResult(encounter, battle, idMap, defeat, seedRef.current, encounter.language);
+                      setReturned("saving");
+                      void onReturn(result, battle).then((r) => setReturned(r === "" ? "done" : r === "saved" ? "saved" : "error:" + r));
+                    }}>{t("battle.return")}</button>
+                  ) : null}
+                  {returned === "saving" && <p className="hint" role="status">{t("battle.returning")}</p>}
+                  {returned === "done" && <p className="hint" role="status">{t("battle.returned")}</p>}
+                  {returned === "saved" && <p className="hint warn" role="status">{t("battle.savedOnly")}</p>}
+                  {returned?.startsWith("error:") && <p className="hint warn" role="alert">{t("battle.returnFail", { why: returned.slice(6) })}</p>}
+                </>
+              ) : (
+                <p className="hint">{t("battle.toChat")}</p>
+              )}
+              <button type="button" className="btn ghost" onClick={restart}>{t("battle.again")}</button>
             </div>
           </section>
         ) : (
