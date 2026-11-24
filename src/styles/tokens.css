@@ -1,0 +1,17 @@
+/* Three themes, named like the shell's: vertep (the look of the mockups: dark, red accent), dark (neutral) and light. */
+:root,
+:root[data-theme="vertep"] {
+  --bg: #07080b; --pn: #0b0c11; --pn2: #12141c; --ln: #2a2f3d; --tx: #ece5d8; --mu: #a7b0c2;
+  --rd: #e2213a; --rd-ink: #ffffff; --cy: #39d5ff; --cy-ink: #031318; --ox: #a3323a; --tl: #538796; --am: #f2a93b;
+  --ok: #4fcf7c; --warn: #f2a93b; --danger: #ff6b7d; --dot: #181b26;
+}
+:root[data-theme="dark"] {
+  --bg: #121316; --pn: #1a1c21; --pn2: #22252c; --ln: #343842; --tx: #ececec; --mu: #a5acb8;
+  --rd: #e5484d; --rd-ink: #ffffff; --cy: #4cc2ff; --cy-ink: #031318; --ox: #b4434a; --tl: #5f9aa8; --am: #f0b04a;
+  --ok: #52c97f; --warn: #f0b04a; --danger: #ff7b85; --dot: #1d2026;
+}
+:root[data-theme="light"] {
+  --bg: #f3f0e8; --pn: #ffffff; --pn2: #f0ece2; --ln: #cfc8b8; --tx: #23201a; --mu: #5d5a52;
+  --rd: #c8142e; --rd-ink: #ffffff; --cy: #0a6c8f; --cy-ink: #ffffff; --ox: #9b2a33; --tl: #3f7280; --am: #9a5f00;
+  --ok: #1d7a43; --warn: #9a5f00; --danger: #b3122b; --dot: #e5e0d3;
+}

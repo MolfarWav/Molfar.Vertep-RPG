@@ -1,0 +1,10 @@
+{
+  "name": "RPG",
+  "version": "0.1.0",
+  "engine": ">=1.0.0",
+  "kind": "app",
+  "description": "An optional RPG companion to Roleplay: character sheets with levels, and turn-based battles with strike zones, guard and magic. Roleplay works fully without it.",
+  "origin": "local",
+  "author": "Molfar Vertep",
+  "repository": "https://github.com/MolfarWav/Molfar.Vertep-RPG"
+}
