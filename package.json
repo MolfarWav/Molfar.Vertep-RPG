@@ -1,0 +1,10 @@
+{
+  "name": "rpg",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "bunx --package typescript@5.9.3 tsc --noEmit -p tsconfig.json",
+    "test": "bun test test/",
+    "sim": "bun scripts/sim.ts"
+  }
+}
