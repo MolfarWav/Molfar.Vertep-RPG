@@ -55,13 +55,9 @@ export function useEncounter(): EncounterApi {
     (async () => {
       try {
         const pend = await call<{ ids: string[] }>("GET", "/encounters/pending");
-        for (const id of pend.ids) {
-          const done = await call("GET", `/results/${id}`).then(() => true, () => false);
-          if (!done) {
-            setWaiting(id);
-            return;
-          }
-        }
+        const kept = new Set((await call<{ ids: string[] }>("GET", "/results")).ids);
+        const open = pend.ids.find((id) => !kept.has(id));
+        if (open) setWaiting(open);
       } catch {
         // no access to Roleplay yet: nothing is waiting that we can see
       }

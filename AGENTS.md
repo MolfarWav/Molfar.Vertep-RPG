@@ -13,6 +13,9 @@ Optional app of Molfar Vertep (repo `MolfarWav/Molfar.Vertep-RPG`). Plan and dec
   `.fork/handoff/guide/FORMAT.md`) once the app has UI.
 - Roleplay is read through `manifest.reads` only, never written. The handoff is an extension, never a dependency.
 
+## Data folder
+`data/` has to exist in the repository (`data/README.md` holds it): the engine only lets a plugin write inside an existing `data/` of its app. Without it every save fails with "path resolves outside app data dir" (found by a run in a real engine, 2026-11-24).
+
 ## Layout
 - `src/rules/`: pure TypeScript, no DOM, no model, seeded RNG. `sheet.ts` (sheet, budget, levels, table sheet), `resolve.ts`
   (one round), `injuries.ts`, `defeat.ts`, `ai.ts` (code opponent), `tuning.ts`, `types.ts`.
