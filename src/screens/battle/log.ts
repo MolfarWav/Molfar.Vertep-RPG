@@ -21,7 +21,7 @@ export function lineOf(e: Event, round: number, who: (id: string) => string, n: 
     case "power":
       return mk(e.heal > 0 ? "good" : "hit", e.heal > 0 ? t("log.heal", { by: who(e.by), target: who(e.target), heal: e.heal }) : e.damage > 0 ? t("log.powerDamage", { by: who(e.by), target: who(e.target), damage: e.damage }) : t("log.powerEffect", { by: who(e.by), target: who(e.target) }));
     case "item":
-      return mk("good", t("log.item", { by: who(e.by), target: who(e.target) }));
+      return mk("good", e.heal > 0 ? t("log.itemHeal", { by: who(e.by), target: who(e.target), heal: e.heal }) : t("log.item", { by: who(e.by), target: who(e.target) }));
     case "flee":
       return mk(e.ok ? "info" : "miss", t(e.ok ? "log.fled" : "log.fleeFailed", { by: who(e.by) }));
     case "bleed":

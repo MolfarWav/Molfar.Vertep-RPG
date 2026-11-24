@@ -1,22 +1,17 @@
 import { useMemo, useRef, useState } from "react";
 import { t } from "@/i18n";
 import { Avatar, HpBar } from "@/components/bars";
-import { exampleFoes, exampleParty, kitFor } from "@/data/fixtures";
+import { ENCOUNTER, exampleFoes, exampleParty, kitFor } from "@/data/fixtures";
 import type { Entry } from "@/data/fixtures";
-import type { Skin, SkinWord } from "@/data/skins";
-import {
-  aiChoices, applyDefeat, fighterFromSheet, GUARD_POINTS, hitChance, makeRng, maxHpOf, parseEffect, resolveRound, standing, ZONE_MULT, ZONES,
-} from "@/rules";
-import type { BattleState, Choice, Fighter, Power, Zone } from "@/rules";
-import { Body } from "./body";
+import type { Skin } from "@/data/skins";
+import { setSources, useSources } from "@/lib/sources";
+import { aiChoices, applyDefeat, fighterFromSheet, GUARD_POINTS, makeRng, maxHpOf, resolveRound, standing, ZONE_MULT } from "@/rules";
+import type { BattleState, Choice, Fighter, Zone } from "@/rules";
+import { ActionPanel, harmful, skinWord } from "./action";
+import type { ItemPick, Kind, Tab } from "./action";
 import { lineOf, nameOf } from "./log";
 import type { Line } from "./log";
-
-const word = (skin: Skin, w: SkinWord): string => {
-  const key = `skin.${skin}.${w}`;
-  const v = t(key);
-  return v === key ? t(`skin.fantasy.${w}`) : v;
-};
+import { ChatDraft, DashStatus, PartyCards, RoundLog, Src, TurnStrip } from "./panels";
 
 function build(entries: Entry[]): BattleState {
   const src = (entries.length ? entries : exampleParty()).slice(0, 4);
@@ -25,31 +20,30 @@ function build(entries: Entry[]): BattleState {
   return { round: 0, fighters: [...party, ...foes], stakes: { flee: true, defeat: 2 }, outcome: null, now: 0 };
 }
 
-const harmful = (p: Power): boolean => {
-  const fx = parseEffect(p.effect);
-  return !!fx && (fx.key === "damage" || fx.key === "burn" || fx.key === "hit_mod");
+const DASH_KEY = "rpg:dash-status";
+const readDash = (): boolean => {
+  try {
+    return localStorage.getItem(DASH_KEY) !== "0";
+  } catch {
+    return true;
+  }
 };
-const powerLine = (p: Power): string => {
-  const fx = parseEffect(p.effect);
-  if (!fx) return "";
-  if (fx.key === "damage") return t("power.damage", { n: fx.a });
-  if (fx.key === "heal") return t("power.heal", { n: fx.a });
-  if (fx.key === "burn") return t("power.burn", { n: fx.a, r: fx.b });
-  return t("power.hitMod", { n: fx.a, r: fx.b });
-};
-
-type Tab = "strike" | "magic" | "guard";
 
 export function BattleScreen({ entries, skin, seed }: { entries: Entry[]; skin: Skin; seed?: number }) {
   const [battle, setBattle] = useState<BattleState>(() => build(entries));
   const [lines, setLines] = useState<Line[]>([]);
   const [pending, setPending] = useState<Choice[]>([]);
+  const [picks, setPicks] = useState<Record<string, string>>({});
   const [control, setControl] = useState<"party" | "hero">("party");
   const [tab, setTab] = useState<Tab>("strike");
+  const [kind, setKind] = useState<Kind>("strike");
   const [zone, setZone] = useState<Zone>("torso");
   const [guard, setGuard] = useState<Zone[]>(["head", "torso"]);
   const [powerId, setPowerId] = useState<string | null>(null);
+  const [item, setItem] = useState<ItemPick | null>(null);
   const [targetId, setTargetId] = useState<string | null>(null);
+  const [dashOn, setDashOnState] = useState<boolean>(readDash);
+  const sources = useSources();
   const rng = useRef(makeRng(seed ?? Date.now() % 100000));
 
   const party = battle.fighters.filter((f) => f.side === "party");
@@ -59,24 +53,60 @@ export function BattleScreen({ entries, skin, seed }: { entries: Entry[]; skin: 
   const deciders = control === "party" ? standingParty : standingParty.filter((f) => f.id === hero?.id);
   const active: Fighter | undefined = battle.outcome ? undefined : deciders[pending.length];
   const power = active?.powers.find((p) => p.id === powerId && (p.uses === undefined || p.uses > 0)) ?? null;
-  const usingPower = tab === "magic" && power !== null;
-  const wantAlly = usingPower && power !== null && !harmful(power);
+  const itemObj = active && item ? (item.from === "belt" ? active.belt : active.backpack).find((i) => i.id === item.id) ?? null : null;
+  const usingPower = kind === "power" && power !== null;
+  const usingItem = kind === "item" && itemObj !== null;
+  const wantAlly = (usingPower && power !== null && !harmful(power)) || usingItem;
   const pool = wantAlly ? standingParty : foes.filter(standing);
-  // a friend to help defaults to the most hurt one, an enemy to the first standing one
   const byHurt = [...pool].sort((a, b) => a.hp / maxHpOf(a) - b.hp / maxHpOf(b));
   const target = pool.find((f) => f.id === targetId) ?? (wantAlly ? byHurt[0] : pool[0]);
-  const who = useMemo(() => nameOf(battle.fighters), [battle.fighters]);
-  const hasMagic = !!active && active.powers.length > 0;
+  const guardMax = usingItem && item?.from === "backpack" ? GUARD_POINTS - 1 : GUARD_POINTS;
+  const shownGuard = guard.slice(0, guardMax);
+  const ready = !!active && !!target && (kind === "strike" || usingPower || usingItem);
 
   const resetPick = () => {
     setTab("strike");
+    setKind("strike");
     setPowerId(null);
+    setItem(null);
     setTargetId(null);
     setGuard(["head", "torso"]);
   };
+  const setDash = (v: boolean) => {
+    setDashOnState(v);
+    try {
+      localStorage.setItem(DASH_KEY, v ? "1" : "0");
+    } catch {
+      // storage can be blocked
+    }
+  };
+  const changeTab = (next: Tab) => {
+    setTab(next);
+    if (next === "strike") {
+      setKind("strike");
+      setTargetId(null);
+    } else if (next === "magic") {
+      const first = active?.powers.find((p) => p.uses === undefined || p.uses > 0);
+      if (first) {
+        setPowerId(first.id);
+        setKind("power");
+        setTargetId(null);
+      }
+    } else if (next === "items") {
+      setKind("item");
+      setTargetId(null);
+    }
+  };
+  const toggleGuard = (z: Zone) => setGuard((g) => (g.includes(z) ? g.filter((x) => x !== z) : g.length >= guardMax ? g : [...g, z]));
+  const guardText = shownGuard.length ? shownGuard.map((z) => t("zone." + z)).join(" + ") : t("battle.none");
+  const pickText = (): string => {
+    const what = usingPower && power ? power.name : usingItem && itemObj ? itemObj.name : `${t("battle.strikeLow")} ${t("zone." + zone)} ×${ZONE_MULT[zone].toFixed(1)}`;
+    return `${what} ✓ · ${skinWord(skin, "guard").toLowerCase()} ${guardText} ✓`;
+  };
 
-  const play = (choice: Choice) => {
+  const play = (choice: Choice, text: string) => {
     const next = [...pending, choice];
+    setPicks((p) => ({ ...p, [choice.by]: text }));
     if (next.length < deciders.length) {
       setPending(next);
       resetPick();
@@ -95,171 +125,129 @@ export function BattleScreen({ entries, skin, seed }: { entries: Entry[]; skin: 
     setLines((old) => [...fresh, ...old].slice(0, 80));
     setBattle(out.state);
     setPending([]);
+    setPicks({});
     resetPick();
   };
 
   const fight = () => {
-    if (!active) return;
-    if (usingPower && power && target) play({ kind: "power", by: active.id, power: power.id, target: target.id, guard });
-    else if (target) play({ kind: "strike", by: active.id, target: target.id, zone, guard });
+    if (!active || !target) return;
+    const g = shownGuard;
+    if (usingPower && power) play({ kind: "power", by: active.id, power: power.id, target: target.id, guard: g }, pickText());
+    else if (usingItem && item && itemObj) play({ kind: "item", by: active.id, from: item.from, item: itemObj.id, target: target.id, guard: g }, pickText());
+    else play({ kind: "strike", by: active.id, target: target.id, zone, guard: g }, pickText());
   };
   const restart = () => {
     setBattle(build(entries));
     setLines([]);
     setPending([]);
+    setPicks({});
     resetPick();
     setControl("party");
   };
-  const toggleGuard = (z: Zone) => setGuard((g) => (g.includes(z) ? g.filter((x) => x !== z) : g.length >= GUARD_POINTS ? g : [...g, z]));
+
+  const who = useMemo(() => nameOf(battle.fighters), [battle.fighters]);
   const defeat = battle.outcome === "lost" ? applyDefeat(battle, rng.current, hero?.id) : null;
-  const decided = (id: string) => pending.find((c) => c.by === id);
-  const stateOf = (f: Fighter): string =>
-    !standing(f) ? t(f.fled ? "battle.fled" : f.dead ? "battle.dead" : "battle.down") : active?.id === f.id ? t("battle.choosing") : decided(f.id) ? t("battle.chosen") : control === "hero" && f.id !== hero?.id ? t("battle.onItsOwn") : t("battle.waiting");
-  const summary = usingPower && power ? `${power.name}` : `${t("battle.strike")}: ${t("zone." + zone)} ×${ZONE_MULT[zone]}`;
+  const summary = useMemo(() => {
+    const foesText = foes.map((f) => `${f.name} ${f.hp}/${maxHpOf(f)}`).join(", ");
+    const partyText = party.filter((f) => f.id !== hero?.id).map((f) => `${f.name} ${f.hp}/${maxHpOf(f)}`).join(", ");
+    const fled = battle.fighters.some((f) => f.fled);
+    return t("battle.summary", { round: battle.round, foes: foesText, party: partyText, fled: fled ? t("battle.fledYes") : t("battle.fledNo"), loot: t("enc.loot") });
+  }, [battle, foes, party, hero?.id]);
+  void who;
+
+  const stakeDefeat = ["robbed", "wounded", "captured", "deadly"][battle.stakes.defeat - 1];
+  const strip = [...party, ...foes];
+  const sideBtn = (f: Fighter, ally: boolean) => {
+    const targetable = ally ? wantAlly : !wantAlly;
+    const picked = target?.id === f.id && targetable;
+    return (
+      <li key={f.id}>
+        <button type="button" className={"fig" + (ally ? "" : " foe") + (picked ? " target" : "") + (standing(f) ? "" : " out") + (active?.id === f.id ? " acting" : "")} disabled={!targetable || !standing(f) || !active} aria-pressed={picked} aria-label={t("battle.target", { name: f.name })} onClick={() => setTargetId(f.id)}>
+          <Avatar name={f.name} size={ally ? 44 : 48} hero={active?.id === f.id} />
+          <b>{f.name}</b>
+          <span className="mono mu">{ally ? f.hp : `${f.hp}/${maxHpOf(f)}`}</span>
+        </button>
+      </li>
+    );
+  };
 
   return (
     <div className="battle">
       <header className="card b-head">
         <h2 className="k">{t("battle.title")}</h2>
         <span className="chip tl" title={t("battle.exampleHint")}>{t("battle.example")}</span>
-        <span className="chip">{t("skin." + skin)}</span>
-        <span className="chip am" role="status">{t("battle.round", { n: battle.round + 1 })}</span>
-        <div className="seg" role="group" aria-label={t("battle.control")}>
-          <button type="button" className={control === "party" ? "on" : ""} aria-pressed={control === "party"} onClick={() => { setControl("party"); setPending([]); }}>{t("battle.wholeParty")}</button>
-          <button type="button" className={control === "hero" ? "on" : ""} aria-pressed={control === "hero"} onClick={() => { setControl("hero"); setPending([]); }}>{t("battle.onlyHero")}</button>
-        </div>
+        <span className="chip mono">{t("battle.contract", { v: ENCOUNTER.contract })}</span>
+        <span className="grow" />
+        {battle.stakes.flee && <span className="chip am">{t("battle.fleeAllowed")}</span>}
+        <span className="chip rd" title={t("defeat.step" + battle.stakes.defeat)}>{t("battle.defeatChip", { step: t("defeat.name." + stakeDefeat) })}</span>
+        <span className="chip" role="status">{t("battle.round", { n: battle.round + (battle.outcome ? 0 : 1) })}</span>
+        <label className="chk"><input type="checkbox" checked={sources} onChange={(e) => setSources(e.target.checked)} /> {t("battle.showSources")}</label>
       </header>
 
-      <section className="card b-field" aria-label={t("battle.field")}>
-        <div className="hd"><span className="lab">{word(skin, "field")}</span>{active && <span className="mu">{t("battle.turnOf", { name: active.name })}</span>}</div>
-        <div className="bd field">
-          <ul className="side">
-            {party.map((f) => (
-              <li key={f.id}>
-                <button type="button" className={"fig" + (wantAlly && target?.id === f.id ? " target" : "") + (standing(f) ? "" : " out")} disabled={!wantAlly || !standing(f)} aria-pressed={wantAlly && target?.id === f.id} aria-label={t("battle.target", { name: f.name })} onClick={() => setTargetId(f.id)}>
-                  <Avatar name={f.name} size={44} hero={active?.id === f.id} />
-                  <b>{f.name}{f.id === hero?.id ? ` · ${t("battle.you")}` : ""}</b>
-                  <HpBar now={f.hp} max={maxHpOf(f)} />
-                  <span className="mu mono b-state">{stateOf(f)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <span className="vs k">{t("battle.vs")}</span>
-          <ul className="side">
-            {foes.map((f) => (
-              <li key={f.id}>
-                <button type="button" className={"fig foe" + (!wantAlly && target?.id === f.id ? " target" : "") + (standing(f) ? "" : " out")} disabled={wantAlly || !standing(f)} aria-pressed={!wantAlly && target?.id === f.id} aria-label={t("battle.target", { name: f.name })} onClick={() => setTargetId(f.id)}>
-                  <Avatar name={f.name} size={44} />
-                  <b>{f.name}</b>
-                  <HpBar now={f.hp} max={maxHpOf(f)} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-        {active && <div className="hint b-hint">{wantAlly ? t("battle.pickAlly") : t("battle.pickFoe")}</div>}
-      </section>
+      <p className="scene k">«{t("enc.scene")}» <Src k="sensor" /></p>
 
-      {battle.outcome ? (
-        <section className="card b-end" role="status">
-          <div className="bd">
-            <h2 className="k">{t("outcome." + battle.outcome)}</h2>
-            <p>{t("outcome." + battle.outcome + ".text", { rounds: battle.round })}</p>
-            {defeat && (
-              <p className="mu">{t("defeat.step" + defeat.step)}{defeat.offer.length ? " " + t("defeat.offer") : ""}</p>
-            )}
-            <p className="hint">{t("battle.toChat")}</p>
-            <button type="button" className="btn go" onClick={restart}>{t("battle.again")}</button>
+      <TurnStrip fighters={strip} heroId={hero?.id} picks={picks} activeId={active?.id} />
+
+      <PartyCards party={party} heroId={hero?.id} picks={picks} activeId={active?.id} control={control} />
+
+      <div className="b-center">
+        <section className="card b-field" aria-label={t("battle.field")}>
+          <div className="bd field">
+            <ul className="side">{party.map((f) => sideBtn(f, true))}</ul>
+            <span className="vs"><span className="k">{t("battle.vs")}</span><b>{t("battle.place")}</b></span>
+            <ul className="side">{foes.map((f) => sideBtn(f, false))}</ul>
+          </div>
+          <div className="hint b-hint">
+            {active ? <><b>{active.name}</b> → <b>{target?.name ?? "…"}</b> · {wantAlly ? t("battle.pickAlly") : t("battle.pickFoe")} <Src k="code" /></> : battle.outcome ? "" : t("battle.nobodyActs")}
           </div>
         </section>
-      ) : (
-        <section className="card b-act" aria-label={t("battle.action")}>
-          <div className="hd">
-            <span className="lab">{t("battle.action")}</span>
-            <div className="seg" role="tablist" aria-label={t("battle.action")}>
-              <button type="button" role="tab" aria-selected={tab === "strike"} className={tab === "strike" ? "on" : ""} onClick={() => { setTab("strike"); setPowerId(null); }}>{t("battle.strike")}</button>
-              {hasMagic && <button type="button" role="tab" aria-selected={tab === "magic"} className={tab === "magic" ? "on" : ""} onClick={() => { setTab("magic"); setPowerId(active?.powers.find((p) => p.uses === undefined || p.uses > 0)?.id ?? null); }}>{word(skin, "powers")}</button>}
-              <button type="button" role="tab" aria-selected={tab === "guard"} className={tab === "guard" ? "on" : ""} onClick={() => setTab("guard")}>{word(skin, "guard")} · {GUARD_POINTS - guard.length}</button>
+
+        {battle.outcome ? (
+          <section className="card b-end" role="status">
+            <div className="bd">
+              <h2 className="k">{t("outcome." + battle.outcome)}</h2>
+              <p>{t("outcome." + battle.outcome + ".text", { rounds: battle.round })}</p>
+              {defeat && <p className="mu">{t("defeat.step" + defeat.step)}{defeat.offer.length ? " " + t("defeat.offer") : ""}</p>}
+              <p className="hint">{t("battle.toChat")}</p>
+              <button type="button" className="btn go" onClick={restart}>{t("battle.again")}</button>
             </div>
-          </div>
-          <div className="bd act">
-            {tab === "strike" && active && (
-              <div className="act-strike">
-                <Body value={zone} onPick={setZone} mode="strike" />
-                <ul className="zones">
-                  {ZONES.map((z) => (
-                    <li key={z}>
-                      <button type="button" className={"zone-row" + (zone === z ? " on" : "")} aria-pressed={zone === z} onClick={() => setZone(z)}>
-                        <b>{t("zone." + z)}</b>
-                        <span className="mono mu">×{ZONE_MULT[z]}{target ? ` · ${Math.round(hitChance(active, target, z))}%` : ""}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+          </section>
+        ) : (
+          <>
+            {active && (
+              <ActionPanel
+                skin={skin} active={active} target={target} tab={tab} setTab={changeTab} zone={zone} guard={shownGuard} guardMax={guardMax}
+                setZone={(z) => { setZone(z); setKind("strike"); setTab("strike"); setTargetId(null); }}
+                toggleGuard={toggleGuard} powerId={powerId}
+                pickPower={(id) => { setPowerId(id); setKind("power"); setTargetId(null); }}
+                item={item} pickItem={(p) => { setItem(p); setKind("item"); setTargetId(null); }} kind={kind}
+              />
+            )}
+            <div className="card b-foot" aria-label={t("battle.chosenAction")}>
+              <div className="b-chips">
+                <span className="chip rd">{usingPower && power ? power.name : usingItem && itemObj ? itemObj.name : kind === "item" ? t("battle.pickItem") : `${t("battle.strikeLow")}: ${t("zone." + zone)} ×${ZONE_MULT[zone].toFixed(1)}`} {ready ? "✓" : ""}</span>
+                <span className="chip tl">{skinWord(skin, "guard").toLowerCase()}: {guardText} ✓</span>
               </div>
-            )}
-            {tab === "magic" && active && (
-              <ul className="powers">
-                {active.powers.map((p) => {
-                  const spent = p.uses !== undefined && p.uses <= 0;
-                  return (
-                    <li key={p.id}>
-                      <button type="button" className={"power-row" + (powerId === p.id ? " on" : "")} aria-pressed={powerId === p.id} disabled={spent} onClick={() => { setPowerId(p.id); setTargetId(null); }}>
-                        <b className="k">{p.name}</b>
-                        <span className="mu">{powerLine(p)}{p.uses !== undefined ? ` · ${t("power.uses", { n: p.uses })}` : ""}</span>
-                        <span className="chip mono">{harmful(p) ? t("power.foe") : t("power.ally")}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-                <li className="hint">{t("power.hint")}</li>
-              </ul>
-            )}
-            {tab === "guard" && (
-              <div className="act-strike">
-                <Body value={zone} guard={guard} onPick={toggleGuard} mode="guard" />
-                <ul className="zones">
-                  {ZONES.map((z) => (
-                    <li key={z}>
-                      <button type="button" className={"zone-row guard" + (guard.includes(z) ? " on" : "")} aria-pressed={guard.includes(z)} disabled={!guard.includes(z) && guard.length >= GUARD_POINTS} onClick={() => toggleGuard(z)}>
-                        <b>{t("zone." + z)}</b>
-                        <span className="mono mu">{guard.includes(z) ? t("battle.guarded") : ""}</span>
-                      </button>
-                    </li>
-                  ))}
-                  <li className="hint">{t("battle.guardHint", { word: word(skin, "guard").toLowerCase() })}</li>
-                </ul>
+              <div className="b-btns">
+                {battle.stakes.flee && active && <button type="button" className="btn ghost" onClick={() => play({ kind: "flee", by: active.id }, t("battle.flee"))}>{t("battle.flee")}</button>}
+                {active && <button type="button" className="btn" onClick={() => play({ kind: "skip", by: active.id, guard: shownGuard }, t("battle.skip"))}>{t("battle.skip")}</button>}
+                {active ? (
+                  <button type="button" className="btn go big" disabled={!ready} onClick={fight}>{deciders.length > 1 && pending.length < deciders.length - 1 ? t("battle.next") : t("battle.fight")}</button>
+                ) : (
+                  <button type="button" className="btn go big" onClick={() => play({ kind: "skip", by: hero?.id ?? "", guard: [] }, "")}>{t("battle.nextRound")}</button>
+                )}
               </div>
-            )}
-          </div>
-          <footer className="b-foot">
-            <span className="chip rd">{summary} ✓</span>
-            <span className="chip tl">{word(skin, "guard")}: {guard.length ? guard.map((z) => t("zone." + z)).join(" + ") : t("battle.none")} ✓</span>
-            <span className="grow" />
-            {battle.stakes.flee && active && <button type="button" className="btn ghost" onClick={() => active && play({ kind: "flee", by: active.id })}>{t("battle.flee")}</button>}
-            {active && <button type="button" className="btn" onClick={() => active && play({ kind: "skip", by: active.id, guard })}>{t("battle.skip")}</button>}
-            {active ? (
-              <button type="button" className="btn go big" disabled={!target} onClick={fight}>{deciders.length > 1 && pending.length < deciders.length - 1 ? t("battle.next") : t("battle.fight")}</button>
-            ) : (
-              <button type="button" className="btn go big" onClick={() => play({ kind: "skip", by: hero?.id ?? "", guard: [] })}>{t("battle.nextRound")}</button>
-            )}
-          </footer>
-        </section>
-      )}
+              <p className="hint grow-line">{!ready && active ? t("battle.notReady") + " " : ""}{t("battle.keptByCode")} <Src k="code" /></p>
+            </div>
+          </>
+        )}
+      </div>
 
-      <section className="card b-log" aria-label={t("battle.log")}>
-        <div className="hd"><span className="lab">{t("battle.log")}</span></div>
-        <ol className="bd log" aria-live="polite">
-          {lines.length === 0 && <li className="hint">{t("battle.logEmpty")}</li>}
-          {lines.map((l) => (
-            <li key={l.id + l.text} className={"ln " + l.tone}>
-              <span className="mono mu">r{l.round}</span> {l.text}
-            </li>
-          ))}
-        </ol>
-        <div className="hint bd">{t("battle.logNote")}</div>
-      </section>
+      <aside className="b-side">
+        <RoundLog lines={lines} />
+        <ChatDraft text={summary} />
+        <DashStatus on={dashOn} setOn={setDash} hero={hero} control={control} setControl={(c) => { setControl(c); setPending([]); setPicks({}); }} />
+      </aside>
     </div>
   );
 }
