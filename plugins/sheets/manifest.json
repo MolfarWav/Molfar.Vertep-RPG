@@ -1,0 +1,8 @@
+{
+  "name": "RPG sheets",
+  "version": "0.1.0",
+  "description": "Stores the character sheets of the RPG app, one file each in the app's data folder.",
+  "origin": "local",
+  "permissions": ["routes", "fs"],
+  "priority": 30
+}

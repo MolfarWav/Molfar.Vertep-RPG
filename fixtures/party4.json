@@ -1,0 +1,6 @@
+[
+  { "name": "Hero", "level": 3, "stats": { "might": 6, "agility": 5, "endurance": 6, "wits": 3, "spirit": 4 }, "weapon": 1.15 },
+  { "name": "Healer", "level": 3, "stats": { "might": 3, "agility": 4, "endurance": 5, "wits": 5, "spirit": 6 }, "courage": 30 },
+  { "name": "Scout", "level": 3, "stats": { "might": 4, "agility": 7, "endurance": 4, "wits": 5, "spirit": 3 } },
+  { "name": "Guard", "level": 3, "stats": { "might": 6, "agility": 3, "endurance": 7, "wits": 2, "spirit": 5 } }
+]
